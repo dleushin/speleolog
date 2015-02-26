@@ -43,7 +43,6 @@ int main(int argc, char *argv[])
     int u = cave.size() - 1;
     while (!exit)
     {
-        volume++;
         //отрицательные значения - те, по которым течет вода
         for (int i = 0; i <= u; i++)
         {
@@ -57,38 +56,80 @@ int main(int argc, char *argv[])
                 }
             }
         }
-        cave[0][inputCol] = -1;
         //сообщающиеся сосуды
-        bool up = true;
-        while(up)
+        //ищем уровень воды
+        int waterline = -1;
+        double sum = 0;
+        bool linefull = true;
+        volume++;
+        for (int i = 0; i <= u; i++)
         {
-            //ищем уровень воды
-            int waterline = -1;
-            bool linefull = true;
-            for (int i = 0; i <= u; i++)
+            for (int j = 0; j <= u; j++) {
+                if (cave[i][j] < 2 && cave[i][j] > 0)
+                {
+                    waterline = i;
+                    if (cave[i][j] < 1) linefull = false;
+                    sum+=cave[i][j];
+                }
+            }
+            if (waterline > -1) break;
+        }
+        if (waterline > -1 && waterline < u)
+        {
+            //равномерно растекаемся по уровню
+            int availableCellCount = 0;
+            bool full = false;
+            for(int i = 0; i <= u; i++)
             {
-                for (int j = 0; j <= u; j++) {
-                    if (cave[i][j] < 2 && cave[i][j] > 0)
+                if (cave[waterline+1][i] == 1) { full = true; break; }
+
+            }
+            for(int i = 0; i <= u; i++)
+            {
+                if (cave[waterline][i] < 2 && (cave[waterline+1][i] || cave[waterline][i] > 0)) availableCellCount++;
+
+            }
+            if (availableCellCount > 0 && full)
+            {
+                double avg_ = sum / availableCellCount;
+                for(int i = 0; i <= u; i++)
+                {
+                    //новую воду не заливаем. пытаемся разлить имеющуюся после поднятия уровня
+                    if (cave[waterline][i] < 2 && (cave[waterline+1][i] || cave[waterline][i] > 0))
                     {
-                        waterline = i;
-                        if (cave[i][j] < 1) linefull = false;
+                        cave[waterline][i] = avg_;
                     }
                 }
-                if (waterline > -1) break;
-            }
-            if (waterline > -1)
-            {
-                if (linefull)
+                //теперь надо разрулить потоки (воды)
+                int found = false;
+                for(int i = 1; i < u; i++)
                 {
-                //бежим наверх
-
+                    if (cave[waterline][i] == avg_)
+                    {
+                        if (cave[waterline][i-1] == 0 || cave[waterline][i+1] == 0)
+                        {
+                            cave[waterline][i] = -avg_;
+                            found = true;
+                        }
+                    }
+                }
+                if (found)
+                {
+                    volume--;
                 } else
                 {
-                //равномерно растекаемся по уровню
-                //todo: придумать как...
+                    cave[0][inputCol] = -1;
                 }
-
+                draw(cave,"water-up!");
+            } else
+            {
+                //поднять воду не получилось
+                //тогда доливаем
+                cave[0][inputCol] = -1;
             }
+        } else
+        {
+            cave[0][inputCol] = -1;
         }
         draw(cave, "next liter");
         bool waterIsFlowing = true;
@@ -209,7 +250,6 @@ int main(int argc, char *argv[])
                                                 cave[i][j+1] += curVol/2;
                                                 cave[i][j-1] *= -1;
                                                 cave[i][j+1] *= -1;
-                                                draw(cave);
                                                 cave[i][j] = 3;
                                                 move = true;
                                                 break;
