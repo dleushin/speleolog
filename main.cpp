@@ -2,8 +2,14 @@
 #include <QFile>
 #include <QHash>
 #include <QDebug>
-#
-void draw(QHash <int, QHash<int, double> > cave, QString msg = "")
+
+QHash <int, QHash<int, int> > cave;
+int volume = 0;
+int u = 0;
+int inputCol = 0;
+bool full = false;
+
+void draw(QString msg = "")
 {
     qDebug() << msg;
     for(int i = 0; i < cave.size(); i++)
@@ -11,9 +17,166 @@ void draw(QHash <int, QHash<int, double> > cave, QString msg = "")
         QString rr = "";
         for(int j = 0; j < cave[i].size(); j++)
         {
-            rr.append(QString::number(cave[i][j],'f', 2)).append(" ");
+            rr.append(QString::number(abs(cave[i][j]))).append(" ");
         }
         qDebug() << rr;
+    }
+}
+
+void run()
+{
+    while(true)
+    {
+        bool move = false;
+        for (int i = 0; i <= u; i++) {
+            for (int j = 0; j <= u; j++) {
+                if (cave[i][j] < 0)
+                {
+                    //сначала бежим вниз (если можем)
+                    if (i < u && cave[i+1][j] == 0)
+                    {
+                        cave[i+1][j] = -1;
+                        cave[i][j] = 3;
+                        move = true;
+                        break;
+                    } else
+                    {
+                        //вниз не получилось, бежим влево и вправо
+                        if (j > 0 && j < u)
+                        {
+                            if (cave[i][j-1] == 0 && cave[i][j+1] == 0)
+                            {
+                                //можем бежать в обе стороны
+                                cave[i][j-1] = -1;
+                                cave[i][j+1] = -1;
+                                cave[i][j] = 3;
+                                move = true;
+                                break;
+                            } else
+                            {
+                                if ((cave[i][j+1] >= 2 || cave[i][j+1] == -1) && cave[i][j-1] == 0)
+                                {
+                                    //можем бежать только влево
+                                    cave[i][j-1] = -1;
+                                    cave[i][j] = 3;
+                                    move = true;
+                                    break;
+                                } else
+                                {
+                                    if ((cave[i][j-1] >= 2 || cave[i][j-1] == -1) && cave[i][j+1] == 0)
+                                    {
+                                        //можем бежать только вправо
+                                        cave[i][j+1] = -1;
+                                        cave[i][j] = 3;
+                                        move = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if (move) break;
+        }
+        if (!move) break;
+    }
+}
+
+bool checkExit()
+{
+    //убираем курсоры
+    for(int i =0; i <= u; i++)
+    {
+        for(int j = 0; j <= u; j++)
+        {
+            if (cave[i][j] < 0) cave[i][j] = 3;
+        }
+    }
+    bool exit = false;
+    //проверка, что вода выбежала
+    //проверка на боковых выходах
+    for (int i = 0; i <= u; i++) {
+        if ((cave[i][0] != 2 && cave[i][0] > 0) ||
+            (cave[i][u] != 2 && cave[i][u] > 0))
+        {
+            exit = true;
+            break;
+        }
+    }
+    if (!exit)
+    {
+        //проверка снизу и сверху
+        for (int j = 0; j <= u; j++) {
+            if ((cave[u][j] != 2 && cave[u][j] > 0) ||
+                (cave[0][j] != 2 && cave[0][j] > 0 && (j != inputCol || full)))
+            {
+                exit = true;
+                break;
+            }
+        }
+    }
+    return exit;
+}
+
+void fillBottom()
+{
+    //заполняем пройденный маршрут "водой"
+    //ищем "дно"
+    int bottom = -1;
+    for(int i = u; i >= 0; i--)
+    {
+        for(int j = 0; j <= u; j++)
+        {
+            if (cave[i][j] == 3 || cave[i][j] == -1)
+            {
+                bottom = i;
+                break;
+            }
+        }
+        if (bottom > -1) break;
+    }
+    if (bottom > -1)
+    {
+        //считаем требуемый объем, чтобы заполнить наше текущее дно
+        for(int i = 0; i <= u; i++)
+        {
+            if (cave[bottom][i] == 3) cave[bottom][i] = 1;
+        }
+        volume = 0;
+        for(int i =0; i <= u; i++)
+        {
+            for(int j = 0; j <= u; j++)
+            {
+                if (cave[i][j] == 1) volume++;
+            }
+        }
+        //поднимаем уровень воды
+        if (bottom > 0)
+        {
+            bool found = false;
+            for(int i = 0; i <= u; i++)
+            {
+                if ((cave[bottom-1][i] == 0 || cave[bottom-1][i] == 3) && cave[bottom][i] == 1)
+                {
+                    cave[bottom-1][i] = -1;
+                    found = true;
+                }
+            }
+            if (found) volume++;
+        } else if (bottom == 0)
+        {
+            volume++;
+            full = true;
+        }
+    }
+    //сбрасываем маршрут
+    for(int i =0; i <= u; i++)
+    {
+        for(int j = 0; j <= u; j++)
+        {
+            if (cave[i][j] == 3) cave[i][j] = 0;
+        }
     }
 }
 
@@ -21,8 +184,7 @@ int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
     QFile file("input.txt");
-    QHash <int, QHash<int, double> > cave;
-    int inputCol = 0;
+    inputCol = 0;
     if (file.open(QIODevice::ReadOnly | QIODevice::Text))
     {
         int i = 0;
@@ -31,331 +193,28 @@ int main(int argc, char *argv[])
             QString inp = file.readLine().trimmed();
             for(int j=0;j<inp.length();j++)
             {
-                cave[i][j] = inp.mid(j,1).toDouble()*2;
+                cave[i][j] = inp.mid(j,1).toInt()*2;
                 if (i == 0 && cave[i][j] == 0) inputCol = j;
             }
             i++;
         }
-    }
-    double volume = 0;
-    draw(cave, "begin");
-    bool exit = false;
-    int u = cave.size() - 1;
-    while (!exit)
-    {
-        //отрицательные значения - те, по которым течет вода
-        for (int i = 0; i <= u; i++)
+        volume = 1;
+        draw("begin");
+        u = cave.size() - 1;
+        cave[0][inputCol] = -1;
+        while (true)
         {
-            for (int j = 0; j <= u; j++) {
-                if (cave[i][j] >= 3)
-                {
-                    cave[i][j] -= 3;
-                } else if (cave[i][j] < 0)
-                {
-                    cave[i][j] = fabs(cave[i][j]);
-                }
-            }
-        }
-        //сообщающиеся сосуды
-        //ищем уровень воды
-        int waterline = -1;
-        double sum = 0;
-        bool linefull = true;
-        volume++;
-        for (int i = 0; i <= u; i++)
-        {
-            for (int j = 0; j <= u; j++) {
-                if (cave[i][j] < 2 && cave[i][j] > 0)
-                {
-                    waterline = i;
-                    if (cave[i][j] < 1) linefull = false;
-                    sum+=cave[i][j];
-                }
-            }
-            if (waterline > -1) break;
-        }
-        if (waterline > -1 && waterline < u)
-        {
-            //равномерно растекаемся по уровню
-            int availableCellCount = 0;
-            bool full = false;
-            for(int i = 0; i <= u; i++)
+            run();
+            if (!checkExit())
             {
-                if (cave[waterline+1][i] == 1) { full = true; break; }
-
-            }
-            for(int i = 0; i <= u; i++)
-            {
-                if (cave[waterline][i] < 2 && (cave[waterline+1][i] || cave[waterline][i] > 0)) availableCellCount++;
-
-            }
-            if (availableCellCount > 0 && full)
-            {
-                double avg_ = sum / availableCellCount;
-                for(int i = 0; i <= u; i++)
-                {
-                    //новую воду не заливаем. пытаемся разлить имеющуюся после поднятия уровня
-                    if (cave[waterline][i] < 2 && (cave[waterline+1][i] || cave[waterline][i] > 0))
-                    {
-                        cave[waterline][i] = avg_;
-                    }
-                }
-                //теперь надо разрулить потоки (воды)
-                int found = false;
-                for(int i = 1; i < u; i++)
-                {
-                    if (cave[waterline][i] == avg_)
-                    {
-                        if (cave[waterline][i-1] == 0 || cave[waterline][i+1] == 0)
-                        {
-                            cave[waterline][i] = -avg_;
-                            found = true;
-                        }
-                    }
-                }
-                if (found)
-                {
-                    volume--;
-                } else
-                {
-                    cave[0][inputCol] = -1;
-                }
-                draw(cave,"water-up!");
-            } else
-            {
-                //поднять воду не получилось
-                //тогда доливаем
-                cave[0][inputCol] = -1;
-            }
-        } else
-        {
-            cave[0][inputCol] = -1;
-        }
-        draw(cave, "next liter");
-        bool waterIsFlowing = true;
-        while (waterIsFlowing)
-        {
-            //проверка, что вода выбежала
-            //проверка на боковых выходах
-            for (int i = 0; i <= u; i++) {
-                if ((cave[i][0] != 2 && fabs(cave[i][0]) > 0) ||
-                    (cave[i][u] != 2 && fabs(cave[i][u]) > 0))
-                {
-                    exit = true;
-                    break;
-                }
-            }
-            if (!exit)
-            {
-                //проверка снизу
-                for (int j = 0; j <= u; j++) {
-                    if ((cave[u][j] != 2 && fabs(cave[u][j]) > 0))
-                    {
-                        exit = true;
-                        break;
-                    }
-                }
-            }
-            //----------------------------------
-            bool canmove = false;
-            if (!exit)
-            {
-                //бежит водичка...
-                for (int i = 0; i <= u; i++) {
-                    bool move = false;
-                    for (int j = 0; j <= u; j++) {
-                        if (cave[i][j] < 0)
-                        {
-                            double curVol = fabs(cave[i][j]);
-                            //сначала бежим вниз (если можем)
-                            if (i < u && cave[i+1][j] < 1 && cave[i+1][j] >= 0)
-                            {
-                                //вместимость целевой ячейки
-                                double cap = 1 - fabs(cave[i+1][j]);
-                                if (cap >= curVol)
-                                {
-                                    //всю воду можно слить вниз
-                                    cave[i+1][j] += curVol;
-                                    cave[i+1][j] *= -1;
-                                    cave[i][j] = 3;
-                                    move = true;
-                                    break;
-                                } else
-                                {
-                                    //можно перелить только часть
-                                    cave[i+1][j] = -1;
-                                    cave[i][j] += cap;
-                                    cave[i][j] = fabs(cave[i][j])+3;
-                                    move = true;
-                                    break;
-                                }
-                            } else
-                            {
-                            //вниз не получилось, бежим влево и вправо
-                                if (j > 0 && j < u)
-                                {
-                                    if (cave[i][j-1] < 1 && cave[i][j+1] < 1 &&
-                                        cave[i][j-1] >= 0 && cave[i][j+1] >= 0)
-                                    {
-                                        //можем бежать в обе стороны
-                                        double lcap = 1 - fabs(cave[i][j-1]);
-                                        double rcap = 1 - fabs(cave[i][j+1]);
-                                        if (lcap > rcap)
-                                        {
-                                            if (lcap >= curVol)
-                                            {
-                                                //всю воду можно перелить
-                                                cave[i][j-1] += curVol;
-                                                cave[i][j-1] *= -1;
-                                                cave[i][j] = 3;
-                                                move = true;
-                                                break;
-                                            } else
-                                            {
-                                                //можно перелить только часть
-                                                cave[i][j-1] = -1;
-                                                cave[i][j] += lcap;
-                                                cave[i][j] = fabs(cave[i][j])+3;
-                                                move = true;
-                                                break;
-                                            }
-                                        } else if (lcap < rcap)
-                                        {
-                                            if (rcap >= curVol)
-                                            {
-                                                //всю воду можно перелить
-                                                cave[i][j+1] += curVol;
-                                                cave[i][j+1] *= -1;
-                                                cave[i][j] = 3;
-                                                move = true;
-                                                break;
-                                            } else
-                                            {
-                                                //можно перелить только часть
-                                                cave[i][j+1] = -1;
-                                                cave[i][j] += rcap;
-                                                cave[i][j] = fabs(cave[i][j])+3;
-                                                move = true;
-                                                break;
-                                            }
-                                        } else
-                                        {
-                                            //по обе стороны равное кол-во воды
-                                            //распределяем поровну
-                                            int cap = lcap*2;
-                                            if (cap >= curVol)
-                                            {
-                                                //всю воду можно перелить
-                                                cave[i][j-1] += curVol/2;
-                                                cave[i][j+1] += curVol/2;
-                                                cave[i][j-1] *= -1;
-                                                cave[i][j+1] *= -1;
-                                                cave[i][j] = 3;
-                                                move = true;
-                                                break;
-                                            } else
-                                            {
-                                                //можно перелить только часть
-                                                cave[i][j-1] = -1;
-                                                cave[i][j+1] = -1;
-                                                cave[i][j] += cap;
-                                                cave[i][j] = fabs(cave[i][j])+3;
-                                                move = true;
-                                                break;
-                                            }
-                                        }
-                                    } else
-                                    {
-                                        if (cave[i][j+1] >= 2 && cave[i][j-1] < 1 &&
-                                            cave[i][j-1] >= 0)
-                                        {
-                                            //можем бежать только влево
-                                            double cap = 1 - fabs(cave[i][j-1]);
-                                            if (cap >= curVol)
-                                            {
-                                                //всю воду можно перелить
-                                                cave[i][j-1] += curVol;
-                                                cave[i][j-1] *= -1;
-                                                cave[i][j] = 3;
-                                                move = true;
-                                                break;
-                                            } else
-                                            {
-                                                //можно перелить только часть
-                                                cave[i][j-1] = -1;
-                                                cave[i][j] += cap;
-                                                cave[i][j] = fabs(cave[i][j])+3;
-                                                move = true;
-                                                break;
-                                            }
-                                        } else
-                                        {
-                                            if (cave[i][j-1] >= 2 && cave[i][j+1] < 1 &&
-                                                fabs(cave[i][j+1]) >= 0)
-                                            {
-                                                //можем бежать только вправо
-                                                double cap = 1 - fabs(cave[i][j+1]);
-                                                if (cap >= curVol)
-                                                {
-                                                    //всю воду можно перелить
-                                                    cave[i][j+1] += curVol;
-                                                    cave[i][j+1] *= -1;
-                                                    cave[i][j] = 3;
-                                                    move = true;
-                                                    break;
-                                                } else
-                                                {
-                                                    //можно перелить только часть
-                                                    cave[i][j+1] = -1;
-                                                    cave[i][j] += cap;
-                                                    cave[i][j] = fabs(cave[i][j])+3;
-                                                    move = true;
-                                                    break;
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    if (move)
-                    {
-                        canmove = true;
-                        break;
-                    }
-                }
+                fillBottom();
             } else
             {
                 break;
             }
-            //проверка, что залитая вода еще может бежать дальше
-            {
-                if (!canmove)
-                {
-                    //похоже, тупик...
-                    //qDebug() << "deadlock!";
-                    waterIsFlowing = false;
-                    //exit = true;
-                    break;
-                }
-                waterIsFlowing = false;
-                for(int i = 0; i <= u; i ++)
-                {
-                    for(int j = 0; j <= u; j++)
-                    {
-                       if (cave[i][j] < 0)
-                       {
-                           waterIsFlowing = true;
-                           break;
-                       }
-                    }
-                    if (waterIsFlowing) break;
-                }
-            }
-            draw(cave, QString::number(volume));
         }
+        draw("end");
+        qDebug() << volume << " liters required";
     }
-    qDebug() << "need" << volume << " cubes of water";
     return a.exec();
 }
